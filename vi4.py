@@ -3,6 +3,7 @@ import datetime as dt
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
+import random
 
 ticker_id = "GLE.PA"
 now = dt.datetime.now().strftime("20%y-%m-%d")
@@ -53,32 +54,31 @@ for i in range(n):
     yields.append(tempo)
 
 
-weight = []
+def random_weight(n):
+    return np.random.random(n)
 
+weight = random_weight(n)
+
+var = []
+    
 for i in range(n):
-    weight.append(1/n)
+    var.append(np.var(yields[i]))
+    
+covar = np.cov(yields)
 
-def mean_portfolio(yields, weight):
-    n = len(yields)
+n = len(yields)
     
-    mean = []
-    for i in range(n):
-        mean.append(np.mean(yields[i]))
-    
+mean = []
+for i in range(n):
+    mean.append(np.mean(yields[i]))
+
+
+
+def mean_portfolio(weight):
     return np.mean(mean)
-    
-    
 
-def var_portfolio(yields, weight):
-    n = len(yields)
-    
-    var = []
-    
-    for i in range(n):
-        var.append(np.var(yields[i]))
-        
-    covar = np.cov(yields)
-    
+
+def var_portfolio(weight):    
     sum_ = 0
     for i in range(n):
         sum_2 = 0
@@ -89,15 +89,40 @@ def var_portfolio(yields, weight):
     return sum_
         
 
-var_port = var_portfolio(yields, weight)
+var_port = var_portfolio(weight)
+
 
 def contraint1(weight):
     return sum(weight) - 1
 
-def contraint2(yields, weight):
-    return mean_portfolio(yields, weight) - 1
+mu = 0
+mu_max = max(mean)
+
+def contraint2(weight):
+    return mean_portfolio(weight) - mu
 
 cons = [{'type':'eq', 'fun': contraint1},
-        {'type':'eq', 'fun': contraint2}]
+        {'type':'ineq', 'fun': contraint2}]
 
-markowitz_limit = minimize(fun = var_portfolio, x0 = yields[0], args = weight, contraints=cons )
+non_neg = []
+for i in range(n):
+    non_neg.append((0,None))
+non_neg = tuple(non_neg)
+
+volatility_curve = []
+returns_curve = []
+
+nb_point = 10
+
+for i in range(nb_point):
+    mu = mu_max*i/nb_point
+    markowitz_limit = minimize(fun = var_portfolio, x0 = weight, method='SLSQP', constraints=cons, bounds = non_neg )
+    returns_curve.append(mean_portfolio(markowitz_limit.x))
+    volatility_curve.append(np.sqrt(markowitz_limit.fun))
+    print("{}%".format(i*100/nb_point))
+    
+plt.figure("Figure 2")
+plt.xlabel("Standard deviation")
+plt.ylabel("Returns")
+plt.title("Efficient limit")
+plt.plot(volatility_curve, returns_curve)
